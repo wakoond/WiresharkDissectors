@@ -1,0 +1,139 @@
+diff -Nur wireshark-1.8.6-orig/epan/dissectors/packet-mip6.c wireshark-1.8.6/epan/dissectors/packet-mip6.c
+--- wireshark-1.8.6-orig/epan/dissectors/packet-mip6.c	2012-09-25 04:23:21.000000000 -0700
++++ wireshark-1.8.6/epan/dissectors/packet-mip6.c	2013-03-21 04:19:25.938657346 -0700
+@@ -11,6 +11,8 @@
+  * Modifications for NEMO packets (RFC 3963): Bruno Deniaud
+  * (bdeniaud@irisa.fr, nono@chez.com) 12 Oct 2005
+  *
++ * MCoA support added bz Andras Takacs <wakoond@wakoond.hu> 22 March 2013
++ *
+  * Wireshark - Network traffic analyzer
+  * By Gerald Combs <gerald@wireshark.org>
+  * Copyright 1998 Gerald Combs
+@@ -184,6 +186,11 @@
+     "No TLV-header format"
+ };
+ 
++static const true_false_string mip6_bi_h_flag_value = {
++    "Simultaneous Home and Foreign Binding requested",
++    "Simultaneous Home and Foreign Binding not requested"
++};
++
+ /* Binding Acknowledgement status values
+  * http://www.iana.org/assignments/mobility-parameters/mobility-parameters.xhtml
+  */
+@@ -723,6 +730,13 @@
+ #define PMIP6_GREK_ID_OFF     4
+ #define PMIP6_GREK_ID_LEN     4
+ 
++#define MIP6_BI_BID_OFF		2
++#define MIP6_BI_BID_LEN		2
++#define MIP6_BI_STATUS_OFF	4
++#define MIP6_BI_FLAGS_OFF	5
++#define MIP6_BI_COA_OFF		6
++#define MIP6_BI_COA_LEN		16
++
+ #define MIP6_IPV4HAREQ_LEN         6
+ #define MIP6_IPV4HAREQ_PREFIXL_OFF 2
+ #define MIP6_IPV4HAREQ_PREFIXL_LEN 1
+@@ -836,6 +850,11 @@
+ static int hf_mip6_ipv4dra_dra = -1;
+ static int hf_mip6_mobility_opt = -1;
+ 
++static int hf_mip6_bi_bid = -1;
++static int hf_mip6_bi_status = -1;
++static int hf_mip6_bi_h_flag = -1;
++static int hf_mip6_bi_coa = -1;
++
+ /* PMIP BRI */
+ static int hf_pmip6_bri_brtype = -1;
+ static int hf_pmip6_bri_rtrigger = -1;
+@@ -871,6 +890,7 @@
+ static gint ett_mip6_opt_ipv4ha = -1;
+ static gint ett_mip6_opt_ipv4aa = -1;
+ static gint ett_pmip6_opt_grek = -1;
++static gint ett_mip6_opt_bid = -1;
+ static gint ett_mip6_opt_ipv4hareq = -1;
+ static gint ett_mip6_opt_ipv4harep = -1;
+ static gint ett_mip6_opt_ipv4dra = -1;
+@@ -1619,6 +1639,33 @@
+ 
+ }
+ 
++/* 35 Binding Identifier */
++static void
++dissect_mip6_opt_bid(const ip_tcp_opt *optp _U_, tvbuff_t *tvb, int offset,
++             guint optlen, packet_info *pinfo _U_,
++             proto_tree *opt_tree)
++{
++    proto_tree *field_tree = NULL;
++    proto_item *tf;
++
++    tf = proto_tree_add_text(opt_tree, tvb, offset, optlen, "%s", optp->name);
++    field_tree = proto_item_add_subtree(tf, *optp->subtree_index);
++
++    if (optlen >= 2+4) {
++    	proto_tree_add_item(field_tree, hf_mip6_bi_bid, tvb,
++        	offset + MIP6_BI_BID_OFF, MIP6_BI_BID_LEN, ENC_BIG_ENDIAN);
++        proto_tree_add_item(field_tree, hf_mip6_bi_status, tvb,
++                offset + MIP6_BI_STATUS_OFF, 1, ENC_NA);
++        proto_tree_add_item(field_tree, hf_mip6_bi_h_flag, tvb,
++                offset + MIP6_BI_FLAGS_OFF, 1, ENC_NA);
++	if (optlen == 2+20) {
++            proto_tree_add_item(field_tree, hf_mip6_bi_coa, tvb,
++                offset + MIP6_BI_COA_OFF, MIP6_BI_COA_LEN, ENC_NA);
++        }
++    }
++}
++
++
+ /* 36 IPv4 Home Address Request [RFC5844] */
+ static void
+ dissect_pmip6_opt_ipv4hareq(const ip_tcp_opt *optp _U_, tvbuff_t *tvb, int offset,
+@@ -1839,6 +1886,14 @@
+     dissect_pmip6_opt_grek
+ },
+ {
++    MIP6_BI,                   /* 35 Binding Identifier	[RFC5648] */
++    "Binding Identifier",
++    &ett_mip6_opt_bid,
++    OPT_LEN_VARIABLE_LENGTH,
++    0,
++    dissect_mip6_opt_bid
++},
++{
+     MIP6_IPV4HAREQ,             /* 36 IPv4 Home Address Request [RFC5844] */
+     "IPv4 Home Address Request",
+     &ett_mip6_opt_ipv4hareq,
+@@ -2448,10 +2503,20 @@
+     { &hf_pmip6_bri_ag_flag,    { "Global (G) Flag", "mip6.bri_ag",
+                     FT_BOOLEAN, 8, TFS(&tfs_set_notset),
+                     0x40, NULL, HFILL }},
+-
+     { &hf_pmip6_bri_res,        { "Reserved: 1 byte", "mip6.bri_res",
+-                    FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+-
++                    		  FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
++    { &hf_mip6_bi_bid,    	{ "Binding Identifier", "mip6.bi.bid",
++                                  FT_UINT16, BASE_DEC, NULL, 0,
++                                  NULL, HFILL }},
++    { &hf_mip6_bi_status,    	{ "Binding Identifier Status", "mip6.bi.status",
++                                  FT_UINT8, BASE_DEC, NULL, 0,
++                                  NULL, HFILL }},
++    { &hf_mip6_bi_h_flag,      { "Simultaneous Home and Foreign Binding (H) flag", "mip6.bi.h_flag",
++                                  FT_BOOLEAN, 8, TFS(&mip6_bi_h_flag_value),
++                                  0x80, NULL, HFILL }},
++    { &hf_mip6_bi_coa,    	{ "Binding Identifier Care-of Address", "mip6.bi.coa",
++                                  FT_IPv6, BASE_NONE, NULL, 0,
++                                  NULL, HFILL }},
+     };
+ 
+     /* Setup protocol subtree array */
+@@ -2476,6 +2541,7 @@
+         &ett_mip6_opt_ipv4ha,
+         &ett_mip6_opt_ipv4aa,
+         &ett_pmip6_opt_grek,
++	&ett_mip6_opt_bid,
+         &ett_mip6_opt_ipv4hareq,
+         &ett_mip6_opt_ipv4harep,
+         &ett_mip6_opt_ipv4dra,
