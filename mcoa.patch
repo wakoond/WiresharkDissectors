@@ -5,7 +5,7 @@ diff -Nur wireshark-1.8.6-orig/epan/dissectors/packet-mip6.c wireshark-1.8.6/epa
   * Modifications for NEMO packets (RFC 3963): Bruno Deniaud
   * (bdeniaud@irisa.fr, nono@chez.com) 12 Oct 2005
   *
-+ * MCoA support added bz Andras Takacs <wakoond@wakoond.hu> 22 March 2013
++ * MCoA support added by Andras Takacs <wakoond@wakoond.hu> 22 March 2013
 + *
   * Wireshark - Network traffic analyzer
   * By Gerald Combs <gerald@wireshark.org>
