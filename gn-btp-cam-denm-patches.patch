@@ -1,0 +1,335 @@
+--- plugins/gn-src-0.0.5/packet-gn.c	2012-11-05 04:15:02.000000000 -0800
++++ plugins/gn/packet-gn.c	2013-06-28 01:31:21.136716007 -0700
+@@ -755,7 +755,7 @@
+ 
+ /* Code to actually dissect the packets */
+ static int
+-dissect_gn(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
++_dissect_gn(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
+ {
+   guint8 size = 0;
+   guint8 gn_version = 0;
+@@ -768,7 +768,7 @@
+   tvbuff_t *next_tvb;
+   dissector_table_t gn_nh_dissector_table;
+   dissector_handle_t data_handle;
+-  dissector_handle_t ipv6_handle;
++  //dissector_handle_t ipv6_handle;
+ 
+   /* Check that there's enough data */
+   if(tvb_length(tvb) < L_CH)
+@@ -1052,7 +1052,7 @@
+   /* call sub-dissector if any */
+   next_tvb = tvb_new_subset(tvb, size, -1, gn_pl);
+   gn_nh_dissector_table = find_dissector_table("gn.nh");
+-  if(dissector_try_port(gn_nh_dissector_table, gn_nh, next_tvb, pinfo, tree))
++  if(dissector_try_uint(gn_nh_dissector_table, gn_nh, next_tvb, pinfo, tree))
+     return size;
+ 
+   /* default to data dissector for remaining bytes */
+@@ -1063,6 +1063,18 @@
+   return size;
+ }
+ 
++static void
++dissect_gn(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
++{
++	_dissect_gn(tvb, pinfo, tree);
++}
++
++static int
++new_dissect_gn(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void __attribute__((__unused__)) * arg)
++{
++	return _dissect_gn(tvb, pinfo, tree);
++}
++
+ /* Register the protocol with Wireshark */
+ void
+ proto_register_gn(void)
+@@ -1436,10 +1448,10 @@
+ proto_reg_handoff_gn(void)
+ {
+   dissector_handle_t gn_handle, ipv6_handle;
+-  gn_handle = new_create_dissector_handle(dissect_gn, proto_gn);
+-  dissector_add("ethertype", gETHERTYPE_PREF, gn_handle);
++  gn_handle = new_create_dissector_handle(new_dissect_gn, proto_gn);
++  dissector_add_uint("ethertype", gETHERTYPE_PREF, gn_handle);
+ 
+   /* register IPv6 sub-dissector */
+   ipv6_handle = find_dissector("ipv6");
+-  dissector_add("gn.nh", 3, ipv6_handle);
++  dissector_add_uint("gn.nh", 3, ipv6_handle);
+ }
+--- plugins/btp-src-0.0.1/packet-btp.c	2012-11-05 04:15:03.000000000 -0800
++++ plugins/btp/packet-btp.c	2013-06-28 01:29:34.592716035 -0700
+@@ -57,12 +57,12 @@
+ 
+ /* Code to actually dissect the packets */
+ static int
+-dissect_btp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
++_dissect_btp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
+ {
+-  guint16 btp_sport = -1;
++  //guint16 btp_sport = -1;
+   guint16 btp_dport = -1;
+-  guint16 low_port = -1;
+-  guint16 high_port = -1;
++  //guint16 low_port = -1;
++  //guint16 high_port = -1;
+   tvbuff_t *next_tvb;
+   const char *str_btp_type = NULL;
+   dissector_handle_t data_handle;
+@@ -80,9 +80,9 @@
+   col_add_str(pinfo->cinfo, COL_INFO, str_btp_type);
+ 
+   btp_dport = tvb_get_ntohs(tvb, 0);
+-  if(pinfo->match_port == GN_NH_BTP_A) {
+-    btp_sport = tvb_get_ntohs(tvb, 2);
+-  }
++  //if(pinfo->match_port == GN_NH_BTP_A) {
++  //  btp_sport = tvb_get_ntohs(tvb, 2);
++  //}
+  
+   if (tree) { /* we are being asked for details */
+     proto_item *ti = NULL;
+@@ -104,7 +104,7 @@
+ 
+   next_tvb = tvb_new_subset(tvb, 4, -1, -1);
+   btp_port_dissector_table = find_dissector_table("btp.dport");
+-  if(dissector_try_port(btp_port_dissector_table, btp_dport, next_tvb, pinfo, tree))
++  if(dissector_try_uint(btp_port_dissector_table, btp_dport, next_tvb, pinfo, tree))
+     return 4;
+ 
+   /* Get a handle for the generic data dissector. */
+@@ -114,6 +114,18 @@
+   return 4;
+ }
+ 
++static void
++dissect_btp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
++{
++	_dissect_btp(tvb, pinfo, tree);
++}
++
++static int
++new_dissect_btp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void __attribute__((__unused__)) * arg)
++{
++	return _dissect_btp(tvb, pinfo, tree);
++}
++
+ /* Register the protocol with Wireshark */
+ void
+ proto_register_btp(void)
+@@ -155,7 +167,7 @@
+ proto_reg_handoff_btp(void)
+ {
+   dissector_handle_t btp_handle;
+-  btp_handle = new_create_dissector_handle(dissect_btp, proto_btp);
+-  dissector_add("gn.nh", GN_NH_BTP_A, btp_handle);
+-  dissector_add("gn.nh", GN_NH_BTP_B, btp_handle);
++  btp_handle = new_create_dissector_handle(new_dissect_btp, proto_btp);
++  dissector_add_uint("gn.nh", GN_NH_BTP_A, btp_handle);
++  dissector_add_uint("gn.nh", GN_NH_BTP_B, btp_handle);
+ }
+--- plugins/cam-src-0.0.2/packet-cam.c	2012-11-05 04:15:03.000000000 -0800
++++ plugins/cam/packet-cam.c	2013-06-28 01:22:53.304716140 -0700
+@@ -42,7 +42,7 @@
+ #include <stdio.h>
+ #include <string.h>
+ 
+-#include "packet-cam.h"
++//#include "packet-cam.h"
+ 
+ #define PNAME  "CAM"
+ #define PSNAME "CAM"
+@@ -260,11 +260,11 @@
+ 	}else{
+ 		char *str;
+ 		guint32 val;
+-		gint val_start;
++		//gint val_start;
+ 
+-		val_start = offset>>3;
++		//val_start = offset>>3;
+ 		val = 0;
+-		str=ep_alloc(256);
++		str=(char *)ep_alloc(256);
+ 
+ 		g_snprintf(str, 256, " ");
+ 		for(bit=0;bit<((int)(offset&0x07));bit++){
+@@ -361,7 +361,7 @@
+   guint8 *buf;
+ 
+   if (offset & 0x07) {  /* unaligned */
+-    buf = g_malloc(length);
++    buf = (guint8 *)g_malloc(length);
+     for (i=0; i<length; i++) {
+       buf[i] = tvb_get_bits8(tvb, offset + 7*i, 7);
+     }
+@@ -477,7 +477,7 @@
+ static int
+ dissect_cam_TimeStamp(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+   // Workaround for >32bits integer
+-  proto_item *ti = NULL;
++  //proto_item *ti = NULL;
+   header_field_info *hfi;
+   long long dec_value = 0;
+ 
+@@ -1247,6 +1247,7 @@
+ 
+ 
+ 
++#if 0
+ static int
+ dissect_cam_Temperature(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+   offset = dissect_per_constrained_integer(tvb, offset, actx, tree, hf_index,
+@@ -1256,16 +1257,15 @@
+ }
+ 
+ 
+-
+ static int
+ dissect_cam_AmbientAirTemperature(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+   offset = dissect_cam_Temperature(tvb, offset, actx, tree, hf_index);
+ 
+   return offset;
+ }
++#endif
+ 
+-
+-
++#if 0
+ static int
+ dissect_cam_DataReference(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+   offset = dissect_per_IA5String_limitedAscii(tvb, offset, actx, tree, hf_index,
+@@ -1273,8 +1273,9 @@
+ 
+   return offset;
+ }
++#endif
+ 
+-
++#if 0
+ static const value_string cam_WiperSystemFront_vals[] = {
+   {   0, "idle" },
+   {   1, "interval" },
+@@ -1292,6 +1293,7 @@
+ 
+   return offset;
+ }
++#endif
+ 
+ /*--- PDUs ---*/
+ 
+@@ -1802,11 +1804,11 @@
+     initialized = TRUE;
+   } else {
+     if (cam_port != 0) {
+-      dissector_delete("btp.dport", cam_port, cam_handle);
++      dissector_delete_uint("btp.dport", cam_port, cam_handle);
+     }
+   }
+   if (global_cam_port != 0) {
+-    dissector_add("btp.dport", global_cam_port, cam_handle);
++    dissector_add_uint("btp.dport", global_cam_port, cam_handle);
+   }
+   cam_port = global_cam_port;
+ }
+--- plugins/denm-src-0.0.2/packet-denm.c	2012-11-05 04:15:03.000000000 -0800
++++ plugins/denm/packet-denm.c	2013-06-28 01:26:30.736716083 -0700
+@@ -42,7 +42,7 @@
+ #include <stdio.h>
+ #include <string.h>
+ 
+-#include "packet-denm.h"
++//#include "packet-denm.h"
+ 
+ #define PNAME  "DENM"
+ #define PSNAME "DENM"
+@@ -316,11 +316,11 @@
+ 	}else{
+ 		char *str;
+ 		guint32 val;
+-		gint val_start;
++		//gint val_start;
+ 
+-		val_start = offset>>3;
++		//val_start = offset>>3;
+ 		val = 0;
+-		str=ep_alloc(256);
++		str=(char *)ep_alloc(256);
+ 
+ 		g_snprintf(str, 256, " ");
+ 		for(bit=0;bit<((int)(offset&0x07));bit++){
+@@ -417,7 +417,7 @@
+   guint8 *buf;
+ 
+   if (offset & 0x07) {  /* unaligned */
+-    buf = g_malloc(length);
++    buf = (guint8 *)g_malloc(length);
+     for (i=0; i<length; i++) {
+       buf[i] = tvb_get_bits8(tvb, offset + 7*i, 7);
+     }
+@@ -533,7 +533,7 @@
+ static int
+ dissect_denm_TimeStamp(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+   // Workaround for >32bits integer
+-  proto_item *ti = NULL;
++  //proto_item *ti = NULL;
+   header_field_info *hfi;
+   long long dec_value = 0;
+ 
+@@ -1751,7 +1751,7 @@
+ }
+ 
+ 
+-
++#if 0
+ static int
+ dissect_denm_Temperature(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+   offset = dissect_per_constrained_integer(tvb, offset, actx, tree, hf_index,
+@@ -1768,9 +1768,10 @@
+ 
+   return offset;
+ }
++#endif
+ 
+ 
+-
++#if 0
+ static int
+ dissect_denm_DataReference(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+   offset = dissect_per_IA5String_limitedAscii(tvb, offset, actx, tree, hf_index,
+@@ -1778,8 +1779,9 @@
+ 
+   return offset;
+ }
++#endif
+ 
+-
++#if 0
+ static const value_string denm_WiperSystemFront_vals[] = {
+   {   0, "idle" },
+   {   1, "interval" },
+@@ -1797,6 +1799,7 @@
+ 
+   return offset;
+ }
++#endif
+ 
+ /*--- PDUs ---*/
+ 
+@@ -2481,11 +2484,11 @@
+     initialized = TRUE;
+   } else {
+     if (denm_port != 0) {
+-      dissector_delete("btp.dport", denm_port, denm_handle);
++      dissector_delete_uint("btp.dport", denm_port, denm_handle);
+     }
+   }
+   if (global_denm_port != 0) {
+-    dissector_add("btp.dport", global_denm_port, denm_handle);
++    dissector_add_uint("btp.dport", global_denm_port, denm_handle);
+   }
+   denm_port = global_denm_port;
+ }
